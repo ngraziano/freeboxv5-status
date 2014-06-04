@@ -171,20 +171,22 @@ class FreeboxStatus():
 
     def _parseCategory_adsl( self, line ):
         key_mapper = {
-            u"Etat":         "ready",
-            u"Protocole":    "protocol",
-            u"Mode":         "synchro_mode",
-            u"Débit ATM":    "synchro_speed",
-            u"Atténuation":  "attenuation",
-            u"FEC":          "FEC",
-            u"CRC":          "CRC",
-            u"HEC":          "HEC"
+            u"Etat":            "ready",
+            u"Protocole":       "protocol",
+            u"Mode":            "synchro_mode",
+            u"Débit ATM":       "synchro_speed",
+            u"Marge de bruit":  "marge_bruit",
+            u"Atténuation":     "attenuation",
+            u"FEC":             "FEC",
+            u"CRC":             "CRC",
+            u"HEC":             "HEC"
         }
         value_parsers = {
             u"ready":        lambda s: True if s == "Showtime" else False,
             u"protocol":     lambda s:s,
             u"synchro_mode": lambda s:s,
             u"synchro_speed":lambda v: self._parseTwoValues( v, unit="kb/s", keys=['down','up'], cast=int),
+            u"marge_bruit":  lambda v: self._parseTwoValues( v, unit="dB",   keys=['down','up'], cast = float),
             u"attenuation":  lambda v: self._parseTwoValues( v, unit="dB",   keys=['down','up'], cast = float),
             u"FEC":          lambda v: self._parseTwoValues( v, unit=None,   keys=['down','up'], cast = int),
             u"CRC":          lambda v: self._parseTwoValues( v, unit=None,   keys=['down','up'], cast = int),
