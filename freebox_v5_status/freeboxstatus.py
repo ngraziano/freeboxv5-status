@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
 
-import urllib2, re, datetime
+import re
+import datetime
+import urllib3
+
 
 class FreeboxStatus():
     def __init__( self, loadData=True, externalDataFeed=None ):
@@ -51,13 +54,15 @@ class FreeboxStatus():
         self._razInfos()
         if not externalDataFeed:
             try:
-                r = urllib2.urlopen("http://mafreebox.free.fr/pub/fbx_info.txt", timeout=2)
+                http = urllib3.PoolManager()
+                r = http.request("GET", "http://mafreebox.free.fr/pub/fbx_info.txt", timeout=2)
             except:
                 return
-            if r.getcode() != 200:
+            if r.status != 200:
                 return
             charset = r.headers["Content-Type"].split('charset=')[-1]
-            feed = unicode( r.read(), charset )
+                
+            feed = r.data.decode(charset)
         else:
             feed = unicode( externalDataFeed.read(), 'ISO-8859-1' )
         self._parseStatus( feed.splitlines() )
@@ -81,8 +86,8 @@ class FreeboxStatus():
                     self._subcategory_parsers[subcat]( line )
                 elif cat:
                     self._category_parsers[cat]( line )
-            except AttributeError, e:
-                print e
+            except AttributeError as e:
+                print (e)
 
 
     def _parseCategoryName( self, category_fullname ):
@@ -122,12 +127,12 @@ class FreeboxStatus():
 
 
     def _parseUptime( self, uptime_str ):
-        regex = "(?P<days>\d+ jours?, )?(?P<hours>\d+ heures?, )?(?P<min>\d+ minutes?)"
+        regex = r"(?P<days>\d+ jours?, )?(?P<hours>\d+ heures?, )?(?P<min>\d+ minutes?)"
         res = re.match( regex, uptime_str )
         if not res:
             return None
-        groups = dict(map(lambda (k,v): (k,(int(v.partition(" ")[0]) \
-                if v is not None else 0)) , res.groupdict().iteritems()))
+        groups = dict(map(lambda k: (k[0],(int(k[1].partition(" ")[0]) \
+                if k[1] is not None else 0)) , res.groupdict().items()))
         #{'days': '5 jours', 'hours': '1 heure', 'min': '26 minutes'}
         return datetime.timedelta(
             days    = groups["days"],
