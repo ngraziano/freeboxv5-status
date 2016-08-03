@@ -4,7 +4,7 @@
 import urllib2, re, datetime
 
 class FreeboxStatus():
-    def __init__( self, loadData=True, externalDataFeed=None ):    
+    def __init__( self, loadData=True, externalDataFeed=None ):
         self._registerCategoryParsers()
         self._registerSubCategoryParsers()
         self._razInfos()
@@ -62,7 +62,7 @@ class FreeboxStatus():
             feed = unicode( externalDataFeed.read(), 'ISO-8859-1' )
         self._parseStatus( feed.splitlines() )
 
-    
+
     def _parseStatus( self, status ):
         cat, subcat = None, None
         pos = 0
@@ -79,7 +79,7 @@ class FreeboxStatus():
             try:
                 if subcat:
                     self._subcategory_parsers[subcat]( line )
-                elif cat:  
+                elif cat:
                     self._category_parsers[cat]( line )
             except AttributeError, e:
                 print e
@@ -122,18 +122,19 @@ class FreeboxStatus():
 
 
     def _parseUptime( self, uptime_str ):
-        regex = "(?P<days>\d+ jours?,)? (?P<hours>\d+ heures?,)? (?P<min>\d+ minutes?)"
+        regex = "(?P<days>\d+ jours?, )?(?P<hours>\d+ heures?, )?(?P<min>\d+ minutes?)"
         res = re.match( regex, uptime_str )
         if not res:
             return None
-        groups = res.groupdict()
+        groups = dict(map(lambda (k,v): (k,(int(v.partition(" ")[0]) \
+                if v is not None else 0)) , res.groupdict().iteritems()))
         #{'days': '5 jours', 'hours': '1 heure', 'min': '26 minutes'}
         return datetime.timedelta(
-            days    = int(groups["days"].partition(" ")[0]),
-            hours   = int(groups["hours"].partition(" ")[0]),
-            minutes = int(groups["min"].partition(" ")[0])
+            days    = groups["days"],
+            hours   = groups["hours"],
+            minutes = groups["min"]
         )
-    
+
 
     def _parseCategory_telephone( self, line ):
         key_mapper = {
@@ -143,7 +144,7 @@ class FreeboxStatus():
         }
         value_parsers = {
             u"configured":   lambda s: True if s == u"Ok" else False,
-            u"online":       lambda s: False if s == u"Raccroché" else False,
+            u"online":       lambda s: False if s == u"Raccroché" else True,
             u"ringing":      lambda s: False if s == u"Inactive" else True
         }
         self._parseLineWithStaticKey( line, key_mapper, value_parsers, self.status["telephone"] )
@@ -203,6 +204,13 @@ class FreeboxStatus():
                 return { "status": status.strip(), keys[0]:None, keys[1]:None }
             values = values.strip()
         value1, _, value2 = [ v.strip() for v in values.partition("  ") ]
+
+        # si pas d'etat de lien, alors tout a ete decale
+        if not value2:
+            value2 = value1
+            value1 = status
+            status = "No status"
+
         if unit:
             value1, value2 = [ v.partition(" ")[0] for v in [ value1, value2 ] ]
         res = { keys[0]:cast(value1), keys[1]:cast(value2) }
