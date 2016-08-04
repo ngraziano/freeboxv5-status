@@ -7,15 +7,15 @@ import urllib3
 
 
 class FreeboxStatus():
-    def __init__( self, loadData=True, externalDataFeed=None ):
+
+    def __init__(self, loadData=True, externalDataFeed=None):
         self._registerCategoryParsers()
         self._registerSubCategoryParsers()
         self._razInfos()
         if loadData:
-            self.update( externalDataFeed )
+            self.update(externalDataFeed)
 
-
-    def _registerCategoryParsers( self ):
+    def _registerCategoryParsers(self):
         self._category_parsers = {
             "general":      self._parseCategory_general,
             "telephone":    self._parseCategory_telephone,
@@ -24,93 +24,91 @@ class FreeboxStatus():
             "network":      self._parseCategory_network
         }
 
-
-    def _registerSubCategoryParsers( self ):
+    def _registerSubCategoryParsers(self):
         self._subcategory_parsers = {
-            "history":                  lambda status: self._notImplemented, #self._parseSubCategory_general_history,
-            "dhcp":                     lambda status: self._notImplemented, #self._parseSubCategory_network_dhcp,
-            "port_forwarding":          lambda status: self._notImplemented, #self._parseSubCategory_network_portForwarding,
-            "port_range_forwarding":    lambda status: self._notImplemented, #self._parseSubCategory_network_portRangeForwarding,
+            # self._parseSubCategory_general_history,
+            "history": lambda status: self._notImplemented,
+            # self._parseSubCategory_network_dhcp,
+            "dhcp": lambda status: self._notImplemented,
+            # self._parseSubCategory_network_portForwarding,
+            "port_forwarding": lambda status: self._notImplemented,
+            # self._parseSubCategory_network_portRangeForwarding,
+            "port_range_forwarding": lambda status: self._notImplemented,
             "interfaces":               self._parseSubCategory_network_interfaces
         }
 
-
-    def _razInfos( self ):
+    def _razInfos(self):
         self.status = {
             "general": {},
             "telephone": {},
-            "adsl": { "history":{} },
+            "adsl": {"history": {}},
             "wifi": {},
             "network": {
-                "dhcp":{},
-                "port_forwarding":{},
-                "port_range_forwarding":{},
-                "interfaces":{}
+                "dhcp": {},
+                "port_forwarding": {},
+                "port_range_forwarding": {},
+                "interfaces": {}
             }
         }
 
-
-    def update( self, externalDataFeed=None ):
+    def update(self, externalDataFeed=None):
         self._razInfos()
         if not externalDataFeed:
             try:
                 http = urllib3.PoolManager()
-                r = http.request("GET", "http://mafreebox.free.fr/pub/fbx_info.txt", timeout=2)
+                r = http.request(
+                    "GET", "http://mafreebox.free.fr/pub/fbx_info.txt", timeout=2)
             except:
                 return
             if r.status != 200:
                 return
             charset = r.headers["Content-Type"].split('charset=')[-1]
-                
+
             feed = r.data.decode(charset)
         else:
-            feed = unicode( externalDataFeed.read(), 'ISO-8859-1' )
-        self._parseStatus( feed.splitlines() )
+            feed = externalDataFeed.read().decode('ISO-8859-1')
+        self._parseStatus(feed.splitlines())
 
-
-    def _parseStatus( self, status ):
+    def _parseStatus(self, status):
         cat, subcat = None, None
         pos = 0
         for line in status:
             pos += 1
             # Changement de catégorie
-            if line.startswith( "====" ):
-                cat = self._parseCategoryName( status[pos-2] )
+            if line.startswith("===="):
+                cat = self._parseCategoryName(status[pos - 2])
                 subcat = None
                 continue
-            if line.startswith( " -----" ):
-                subcat = self._parseSubCategoryName( status[pos-2] )
+            if line.startswith(" -----"):
+                subcat = self._parseSubCategoryName(status[pos - 2])
                 continue
             try:
                 if subcat:
-                    self._subcategory_parsers[subcat]( line )
+                    self._subcategory_parsers[subcat](line)
                 elif cat:
-                    self._category_parsers[cat]( line )
+                    self._category_parsers[cat](line)
             except AttributeError as e:
-                print (e)
+                print(e)
 
-
-    def _parseCategoryName( self, category_fullname ):
+    def _parseCategoryName(self, category_fullname):
         return {
             u"Informations générales :": "general",
             u"Téléphone :": "telephone",
             u"Adsl :": "adsl",
             u"Wifi :": "wifi",
             u"Réseau :": "network"
-        }.get( category_fullname.strip() )
+        }.get(category_fullname.strip())
 
-
-    def _parseSubCategoryName( self, subcategory_fullname ):
+    def _parseSubCategoryName(self, subcategory_fullname):
         return {
             u"Journal de connexion adsl :": "history",
             u"Attributions dhcp :": "dhcp",
             u"Redirections de ports :": "port_forwarding",
             u"Redirections de plage de ports :": "port_range_forwarding",
             u"Interfaces réseau :": "interfaces"
-        }.get( subcategory_fullname.strip() )
+        }.get(subcategory_fullname.strip())
 
-
-    def _parseCategory_general( self, line ):
+    def _parseCategory_general(self, line):
         key_mapper = {
             u"Modèle":               "fbx_model",
             u"Version du firmware":  "fw_version",
@@ -118,44 +116,43 @@ class FreeboxStatus():
             u"Temps depuis la mise en route": "uptime"
         }
         value_parsers = {
-            u"fbx_model":        lambda s:s,
-            u"fw_version":       lambda s: [ int(v) for v in s.split(".") ],
-            u"connection_mode":  lambda s:s,
+            u"fbx_model": lambda s: s,
+            u"fw_version": lambda s: [int(v) for v in s.split(".")],
+            u"connection_mode": lambda s: s,
             u"uptime":           self._parseUptime
         }
-        self._parseLineWithStaticKey( line, key_mapper, value_parsers, self.status["general"] )
+        self._parseLineWithStaticKey(
+            line, key_mapper, value_parsers, self.status["general"])
 
-
-    def _parseUptime( self, uptime_str ):
+    def _parseUptime(self, uptime_str):
         regex = r"(?P<days>\d+ jours?, )?(?P<hours>\d+ heures?, )?(?P<min>\d+ minutes?)"
-        res = re.match( regex, uptime_str )
+        res = re.match(regex, uptime_str)
         if not res:
             return None
-        groups = dict(map(lambda k: (k[0],(int(k[1].partition(" ")[0]) \
-                if k[1] is not None else 0)) , res.groupdict().items()))
+        groups = dict(map(lambda k: (k[0], (int(k[1].partition(" ")[0])
+                                            if k[1] is not None else 0)), res.groupdict().items()))
         #{'days': '5 jours', 'hours': '1 heure', 'min': '26 minutes'}
         return datetime.timedelta(
-            days    = groups["days"],
-            hours   = groups["hours"],
-            minutes = groups["min"]
+            days=groups["days"],
+            hours=groups["hours"],
+            minutes=groups["min"]
         )
 
-
-    def _parseCategory_telephone( self, line ):
+    def _parseCategory_telephone(self, line):
         key_mapper = {
             u"Etat":             "configured",
             u"Etat du combiné":  "online",
             u"Sonnerie":         "ringing"
         }
         value_parsers = {
-            u"configured":   lambda s: True if s == u"Ok" else False,
-            u"online":       lambda s: False if s == u"Raccroché" else True,
-            u"ringing":      lambda s: False if s == u"Inactive" else True
+            u"configured": lambda s: True if s == u"Ok" else False,
+            u"online": lambda s: False if s == u"Raccroché" else True,
+            u"ringing": lambda s: False if s == u"Inactive" else True
         }
-        self._parseLineWithStaticKey( line, key_mapper, value_parsers, self.status["telephone"] )
+        self._parseLineWithStaticKey(
+            line, key_mapper, value_parsers, self.status["telephone"])
 
-
-    def _parseLineWithStaticKey( self, line, key_mapper, value_parsers, cfg_node ):
+    def _parseLineWithStaticKey(self, line, key_mapper, value_parsers, cfg_node):
         groups = line.strip().partition("  ")
 
         # Si la ligne ne contient pas de clé/valeur
@@ -164,18 +161,17 @@ class FreeboxStatus():
 
         key, value = groups[0].strip(), groups[2].strip()
 
-        key_mapped = key_mapper.get( key )
+        key_mapped = key_mapper.get(key)
         if not key_mapped:
             return
 
-        value_parser = value_parsers.get( key_mapped )
+        value_parser = value_parsers.get(key_mapped)
         if not value_parser:
             return
 
-        cfg_node[key_mapped] = value_parser( value )
+        cfg_node[key_mapped] = value_parser(value)
 
-
-    def _parseCategory_adsl( self, line ):
+    def _parseCategory_adsl(self, line):
         key_mapper = {
             u"Etat":            "ready",
             u"Protocole":       "protocol",
@@ -188,27 +184,27 @@ class FreeboxStatus():
             u"HEC":             "HEC"
         }
         value_parsers = {
-            u"ready":        lambda s: True if s == "Showtime" else False,
-            u"protocol":     lambda s:s,
-            u"synchro_mode": lambda s:s,
-            u"synchro_speed":lambda v: self._parseTwoValues( v, unit="kb/s", keys=['down','up'], cast=int),
-            u"marge_bruit":  lambda v: self._parseTwoValues( v, unit="dB",   keys=['down','up'], cast = float),
-            u"attenuation":  lambda v: self._parseTwoValues( v, unit="dB",   keys=['down','up'], cast = float),
-            u"FEC":          lambda v: self._parseTwoValues( v, unit=None,   keys=['down','up'], cast = int),
-            u"CRC":          lambda v: self._parseTwoValues( v, unit=None,   keys=['down','up'], cast = int),
-            u"HEC":          lambda v: self._parseTwoValues( v, unit=None,   keys=['down','up'], cast = int),
+            u"ready": lambda s: True if s == "Showtime" else False,
+            u"protocol": lambda s: s,
+            u"synchro_mode": lambda s: s,
+            u"synchro_speed": lambda v: self._parseTwoValues(v, unit="kb/s", keys=['down', 'up'], cast=int),
+            u"marge_bruit": lambda v: self._parseTwoValues(v, unit="dB", keys=['down', 'up'], cast=float),
+            u"attenuation": lambda v: self._parseTwoValues(v, unit="dB", keys=['down', 'up'], cast=float),
+            u"FEC": lambda v: self._parseTwoValues(v, unit=None, keys=['down', 'up'], cast=int),
+            u"CRC": lambda v: self._parseTwoValues(v, unit=None, keys=['down', 'up'], cast=int),
+            u"HEC": lambda v: self._parseTwoValues(v, unit=None, keys=['down', 'up'], cast=int),
         }
-        self._parseLineWithStaticKey( line, key_mapper, value_parsers, self.status["adsl"] )
+        self._parseLineWithStaticKey(
+            line, key_mapper, value_parsers, self.status["adsl"])
 
-
-    def _parseTwoValues( self, values, unit, keys, cast=lambda s:s, withStatus=False ):
+    def _parseTwoValues(self, values, unit, keys, cast=lambda s: s, withStatus=False):
         if withStatus:
             # Format: "    status     value1 unit        value2 unit  "
             status, sep, values = values.partition("  ")
             if not sep:
-                return { "status": status.strip(), keys[0]:None, keys[1]:None }
+                return {"status": status.strip(), keys[0]: None, keys[1]: None}
             values = values.strip()
-        value1, _, value2 = [ v.strip() for v in values.partition("  ") ]
+        value1, _, value2 = [v.strip() for v in values.partition("  ")]
 
         # si pas d'etat de lien, alors tout a ete decale
         if not value2:
@@ -217,14 +213,13 @@ class FreeboxStatus():
             status = "No status"
 
         if unit:
-            value1, value2 = [ v.partition(" ")[0] for v in [ value1, value2 ] ]
-        res = { keys[0]:cast(value1), keys[1]:cast(value2) }
+            value1, value2 = [v.partition(" ")[0] for v in [value1, value2]]
+        res = {keys[0]: cast(value1), keys[1]: cast(value2)}
         if withStatus:
-            res.update( {"status":status} )
+            res.update({"status": status})
         return res
 
-
-    def _parseCategory_wifi( self, line ):
+    def _parseCategory_wifi(self, line):
         key_mapper = {
             u"Etat":            "state",
             u"Modèle":          "model",
@@ -236,19 +231,19 @@ class FreeboxStatus():
             u"FreeWifi Secure": "hasFreeWifiSecure"
         }
         value_parsers = {
-            "state":                    lambda s:s,
-            "model":                    lambda s:s,
-            "channel":                  lambda s: int(s),
-            "isActive":                 lambda s: (s == u"Activé" ),
-            "ssid":                     lambda s:s,
-            "key_algorithm":            lambda s:s,
-            "isFreeWifiActive":         lambda s: (s == "Actif"),
-            "isFreeWifiSecureActive":   lambda s: (s == "Actif")
+            "state": lambda s: s,
+            "model": lambda s: s,
+            "channel": lambda s: int(s),
+            "isActive": lambda s: (s == u"Activé"),
+            "ssid": lambda s: s,
+            "key_algorithm": lambda s: s,
+            "isFreeWifiActive": lambda s: (s == "Actif"),
+            "isFreeWifiSecureActive": lambda s: (s == "Actif")
         }
-        self._parseLineWithStaticKey( line, key_mapper, value_parsers, self.status["wifi"] )
+        self._parseLineWithStaticKey(
+            line, key_mapper, value_parsers, self.status["wifi"])
 
-
-    def _parseCategory_network( self, line ):
+    def _parseCategory_network(self, line):
         key_mapper = {
             u"Adresse MAC Freebox":         "mac_address",
             u"Adresse IP":                  "public_ip",
@@ -263,22 +258,22 @@ class FreeboxStatus():
             u"Plage d'adresses dynamique":  "dynamic_ip_range"
         }
         value_parsers = {
-            "mac_adress":                   lambda s:s,
-            "public_ip":                    lambda s:s,
-            "hasIPv6":                      lambda s: (s == u"Activé" ),
-            "routerMode":                   lambda s: (s == u"Activé" ),
-            "private_ip":                   lambda s:s,
-            "DMZ_ip":                       lambda s:s,
-            "freeplayer_ip":                lambda s:s,
-            "isRespondingToPing":           lambda s: ( s == u"Activé" ),
-            "hasWakeOnLanProxy":            lambda s: ( s == u"Activé" ),
-            "hasDHCPServer":                lambda s: ( s == u"Activé" ),
-            "dynamic_ip_range":             lambda s: s.partition(" - ")[0:3:2]
+            "mac_adress": lambda s: s,
+            "public_ip": lambda s: s,
+            "hasIPv6": lambda s: (s == u"Activé"),
+            "routerMode": lambda s: (s == u"Activé"),
+            "private_ip": lambda s: s,
+            "DMZ_ip": lambda s: s,
+            "freeplayer_ip": lambda s: s,
+            "isRespondingToPing": lambda s: (s == u"Activé"),
+            "hasWakeOnLanProxy": lambda s: (s == u"Activé"),
+            "hasDHCPServer": lambda s: (s == u"Activé"),
+            "dynamic_ip_range": lambda s: s.partition(" - ")[0:3:2]
         }
-        self._parseLineWithStaticKey( line, key_mapper, value_parsers, self.status["network"] )
+        self._parseLineWithStaticKey(
+            line, key_mapper, value_parsers, self.status["network"])
 
-
-    def _parseSubCategory_network_interfaces( self, line ):
+    def _parseSubCategory_network_interfaces(self, line):
         key_mapper = {
             u"WAN":         "WAN",
             u"Ethernet":    "ethernet",
@@ -286,13 +281,12 @@ class FreeboxStatus():
             u"Switch":      "switch"
         }
         value_parsers = {
-            "WAN":          lambda v: self._parseTwoValues( v, unit="ko/s", keys=['down','up'], cast=int, withStatus=True ),
-            "ethernet":     lambda v: self._parseTwoValues( v, unit="ko/s", keys=['down','up'], cast=int, withStatus=True ),
-            "USB":          lambda v: self._parseTwoValues( v, unit="ko/s", keys=['down','up'], cast=int, withStatus=True ),
-            "switch":       lambda v: self._parseTwoValues( v, unit="ko/s", keys=['down','up'], cast=int, withStatus=True )
+            "WAN": lambda v: self._parseTwoValues(v, unit="ko/s", keys=['down', 'up'], cast=int, withStatus=True),
+            "ethernet": lambda v: self._parseTwoValues(v, unit="ko/s", keys=['down', 'up'], cast=int, withStatus=True),
+            "USB": lambda v: self._parseTwoValues(v, unit="ko/s", keys=['down', 'up'], cast=int, withStatus=True),
+            "switch": lambda v: self._parseTwoValues(v, unit="ko/s", keys=['down', 'up'], cast=int, withStatus=True)
         }
-        self._parseLineWithStaticKey( line, key_mapper, value_parsers, self.status["network"]["interfaces"] )
+        self._parseLineWithStaticKey(line, key_mapper, value_parsers, self.status["network"]["interfaces"])
 
-
-    def _notImplemented( self ):
+    def _notImplemented(self):
         raise NotImplemented()
