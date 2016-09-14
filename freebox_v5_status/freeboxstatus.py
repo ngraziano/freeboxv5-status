@@ -9,6 +9,7 @@ import urllib3
 class FreeboxStatus():
 
     def __init__(self, loadData=True, externalDataFeed=None):
+        self.http_pool = None
         self._registerCategoryParsers()
         self._registerSubCategoryParsers()
         self._razInfos()
@@ -55,9 +56,10 @@ class FreeboxStatus():
         self._razInfos()
         if not externalDataFeed:
             try:
-                http = urllib3.PoolManager()
-                r = http.request(
-                    "GET", "http://mafreebox.free.fr/pub/fbx_info.txt", timeout=2)
+                if not self.http_pool:
+                    self.http_pool = urllib3.connectionpool.connection_from_url("http://mafreebox.free.fr")
+                r = self.http_pool.request(
+                    "GET", "/pub/fbx_info.txt", timeout=2)
             except:
                 return
             if r.status != 200:
